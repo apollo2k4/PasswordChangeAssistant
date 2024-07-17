@@ -311,7 +311,9 @@ namespace PasswordChangeAssistant
         }
         object pedNewExpireDate;
         DateTime dtNewExpireDate = pedcalc.GetNewExpiryDateUtc(pe, out pedNewExpireDate);
+        bool bOldExpires = EntryExpiry.Checked;
         EntryExpiry.Value = dtNewExpireDate.ToLocalTime();
+        EntryExpiry.Checked = bOldExpires;
         lMsg.Add("PEDCalc result: " + pedNewExpireDate.ToString());
         lMsg.Add("New expiry date:" + dtNewExpireDate.ToLocalTime().ToString());
       }
@@ -633,12 +635,15 @@ namespace PasswordChangeAssistant
         rtbSequence.Text = atc.DefaultSequence;
     }
 
+    bool m_bEditingText = false;
     private void rtbSequence_TextChanged(object sender, EventArgs e)
     {
       string sequence = rtbSequence.Text;
       int i = m_Sequences.IndexOf(sequence);
       if (i == -1) i = m_Sequences.Count - 1;
+      m_bEditingText = true;
       cbSequences.SelectedIndex = Math.Min(i, cbSequences.Items.Count - 1);
+      m_bEditingText = false;
       SprContext ctx = new SprContext();
       ctx.EncodeAsAutoTypeSequence = true;
 
@@ -653,7 +658,15 @@ namespace PasswordChangeAssistant
       if (Config.DefaultPCASequences.TryGetValue(cbSequences.Items[cbSequences.SelectedIndex] as string, out s)
         && !string.IsNullOrEmpty(s)
         && (s != rtbSequence.Text))
+      {
         rtbSequence.Text = s;
+        return;
+      }
+      s = cbSequences.Items[cbSequences.SelectedIndex] as string;
+      if (!m_bEditingText && s == PluginTranslate.EntrySpecificSequence)
+      {
+        rtbSequence.Text = m_pcadata.PCASequence;
+      }
     }
 
     private void HideControl(string ControlName, Form f)

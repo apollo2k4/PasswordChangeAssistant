@@ -242,10 +242,43 @@ namespace PasswordChangeAssistant
           EntryExpiry.Value = DateTime.Now.AddMonths(6).ToLocalTime();
         EntryExpiry.Checked = true;
       }
-      else return;
+//      else return;
 
       //Let's see whether PEDCalc is installed and active
       CheckPEDCalc();
+
+      //Let's see whether KeePassCPOEc is installed and active
+      CheckKeePassCPOE();
+    }
+
+    private void CheckKeePassCPOE()
+    {
+      KeePassCPEOStub kpcpoe = new KeePassCPEOStub((KeePass.Plugins.Plugin)Tools.GetPluginInstance("KeePassCPEO"));
+      if (!kpcpoe.Loaded) return;
+      if (kpcpoe.CustomOptions.Count == 0) return;
+      m_ctxDefaultTimes.Items.Add(new ToolStripSeparator());
+      foreach (var co in kpcpoe.CustomOptions)
+      {
+        var tsmi = new ToolStripMenuItem() { Text = co.ToString(), Tag = co };
+        tsmi.Click += OnKPCPOEClick;
+        m_ctxDefaultTimes.Items.Add(tsmi);
+      }
+    }
+
+    private void OnKPCPOEClick(object sender, EventArgs e)
+    {
+      var tsmi = sender as ToolStripMenuItem;
+      var x = tsmi.Tag.GetType().GetProperties();
+      var y = tsmi.Tag.GetType().GetProperty("Years").GetValue(tsmi.Tag, null);
+      var m = tsmi.Tag.GetType().GetProperty("Months").GetValue(tsmi.Tag, null);
+      var d = tsmi.Tag.GetType().GetProperty("Days").GetValue(tsmi.Tag, null);
+
+      if (y == null || m == null || d == null) return;
+      var dt = Program.MainForm.GetSelectedEntry(true).ExpiryTime;
+      dt = dt.AddYears((int)y);
+      dt = dt.AddMonths((int)y);
+      dt = dt.AddDays((int)d);
+      EntryExpiry.Value = dt.ToLocalTime();
     }
 
     private void CheckPEDCalc()
@@ -278,7 +311,9 @@ namespace PasswordChangeAssistant
         }
         object pedNewExpireDate;
         DateTime dtNewExpireDate = pedcalc.GetNewExpiryDateUtc(pe, out pedNewExpireDate);
+        bool bOldExpires = EntryExpiry.Checked;
         EntryExpiry.Value = dtNewExpireDate.ToLocalTime();
+        EntryExpiry.Checked = bOldExpires;
         lMsg.Add("PEDCalc result: " + pedNewExpireDate.ToString());
         lMsg.Add("New expiry date:" + dtNewExpireDate.ToLocalTime().ToString());
       }
@@ -600,12 +635,15 @@ namespace PasswordChangeAssistant
         rtbSequence.Text = atc.DefaultSequence;
     }
 
+    bool m_bEditingText = false;
     private void rtbSequence_TextChanged(object sender, EventArgs e)
     {
       string sequence = rtbSequence.Text;
       int i = m_Sequences.IndexOf(sequence);
       if (i == -1) i = m_Sequences.Count - 1;
+      m_bEditingText = true;
       cbSequences.SelectedIndex = Math.Min(i, cbSequences.Items.Count - 1);
+      m_bEditingText = false;
       SprContext ctx = new SprContext();
       ctx.EncodeAsAutoTypeSequence = true;
 
@@ -620,7 +658,15 @@ namespace PasswordChangeAssistant
       if (Config.DefaultPCASequences.TryGetValue(cbSequences.Items[cbSequences.SelectedIndex] as string, out s)
         && !string.IsNullOrEmpty(s)
         && (s != rtbSequence.Text))
+      {
         rtbSequence.Text = s;
+        return;
+      }
+      s = cbSequences.Items[cbSequences.SelectedIndex] as string;
+      if (!m_bEditingText && s == PluginTranslate.EntrySpecificSequence)
+      {
+        rtbSequence.Text = m_pcadata.PCASequence;
+      }
     }
 
     private void HideControl(string ControlName, Form f)
